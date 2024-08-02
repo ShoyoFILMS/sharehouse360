@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+div#vision{
+	position:absolute;
+	top:0;
+	left:0;
+}
+ul#jump_map{
+	position:absolute;
+	top:10px;
+	left:10px;
+	z-index:10;
+	font-size:14px;
+	list-style:none;
+	cursor:pointer;
+	padding:0;
+}
+ul#jump_map li{
+	background:#fff;
+	padding:5px;
+	transition:500ms;
+}
+ul#jump_map li.selected{
+	background:#fc0;
+}
+ul#jump_map li:hover{
+	background:#fc0;
+	transform: translateX(10px);
+}
+div#map{
+	position:absolute;
+	top:10px;
+	right:10px;
+	border:1px solid #000;
+	width:250px;
+	height:300px;
+	background:rgba(0, 100, 200,0.5);
+}
+p#tooltip{
+	position:absolute;
+	background:rgba(255, 255, 255,0.5);
+	display:none;
+	padding:5px;
+	font-size:14px;
+	margin:0;
+}
+</style>
+<meta charset="utf-8">
+<title>A-Frame360写真テスト</title>
+<meta name="description" content="A-Frame Panorama Sample">
+<script src="https://aframe.io/releases/0.5.0/aframe.min.js"></script>
+<script src="https://unpkg.com/aframe-animation-component@3.2.1/dist/aframe-animation-component.min.js"></script>
+<script src="https://unpkg.com/aframe-particle-system-component@1.0.x/dist/aframe-particle-system-component.min.js"></script>
+<script src="https://unpkg.com/aframe-extras.ocean@%5E3.5.x/dist/aframe-extras.ocean.min.js"></script>
+<script src="https://unpkg.com/aframe-gradient-sky@1.0.4/dist/gradientsky.min.js"></script>
+<script src="https://rawgit.com/mayognaise/aframe-mouse-cursor-component/master/dist/aframe-mouse-cursor-component.min.js"></script>
+<script src="https://cdn.rawgit.com/konvajs/konva/1.7.6/konva.min.js"></script>
+<script>
+	(function () {
+
+		if ( typeof window.CustomEvent === "function" ) return false;
+
+		function CustomEvent ( event, params ) {
+			params = params || { bubbles: false, cancelable: false, detail: undefined };
+			var evt = document.createEvent( 'CustomEvent' );
+			evt.initCustomEvent( event, params.bubbles, params.cancelable, params.detail );
+			return evt;
+		}
+
+		CustomEvent.prototype = window.Event.prototype;
+
+		window.CustomEvent = CustomEvent;
+	})();
+</script>
+</head>
+<body>
+<div id="article" class="clearfix">
+<div id="vision">
+<a-scene class="fullscreen" canvas="" inspector="" keyboard-shortcuts="" screenshot="" vr-mode-ui="" auto-enter-vr="">
+	<a-entity position="0 0 0" rotation="0 -90 0" scale="" visible=""  wasd-controls-enabled="true">
+		<a-entity camera="" look-controls="" mouse-cursor="" position="" rotation="" scale="" visible="" id="camera">
+			<a-cursor fuse="true" color="yellow" position="" rotation="" scale="" visible="" material="" raycaster="" cursor="" geometry=""></a-cursor>
+		</a-entity>
+	</a-entity>
+
+	<a-sky src="./img/entrance.jpg" rotation="0 0 0" class="sky"></a-sky>
+	<a-image src="./icon/arrow.png" rotation="0 0 0" position="0 0 0" class="arrow1"></a-image>
+	<a-image src="./icon/arrow.png" rotation="0 0 0" position="0 0 0" class="arrow2"></a-image>
+	<a-image src="./icon/arrow.png" rotation="0 0 0" position="0 0 0" class="arrow3"></a-image>
+	<a-image src="./icon/circle.png" rotation="0 0 0" position="0 0 0" class="circle1"></a-image>
+	<a-image src="./icon/circle.png" rotation="0 0 0" position="0 0 0" class="circle2"></a-image>
+</a-scene>
+</div>
+<div id="map"></div>
+<p id="tooltip"></p>
+<ul id="jump_map"></ul>
+</div><!--end article-->
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+<script src="https://unpkg.com/konva@3.2.4/konva.min.js"></script>
+<script>
+
+let area_name={"entrance":"玄関",
+"corridor_1f1":"1階廊下 1",
+"corridor_1f2":"1階廊下 2",
+"corridor_1f3":"1階廊下 3",
+"stair_1f":"1階階段下",
+"bathroom_1f1":"1階トイレ 1",
+"bathroom_1f2":"1階トイレ 2",
+"kitchen1":"共有キッチン 1",
+"kitchen2":"共有キッチン 2",
+"washitsu":"和室",
+"smokeroom":"喫煙室",
+"corridor_2f1":"2階廊下 1",
+"corridor_2f2":"2階廊下 2",
+"corridor_2f3":"2階廊下 3",
+"stair_2f1":"階段踊場",
+"stair_2f2":"2階階段前",
+"laundry_2f1":"2階洗濯・シャワー室 1",
+"laundry_2f2":"2階洗濯・シャワー室 2",
+"room":"個室(2階)",
+"out":"2階外",
+"verandah":"2階ベランダ",
+"garden":"庭"};
+
+let areas={};
+let labels=[];
+let icons=[];
+let icon_links=[];
+let move_from="";
+
+function resetUI(name){
+	$("ul#jump_map li").removeClass("selected");
+	$("ul#jump_map li[sky="+name+"]").addClass("selected");
+
+	if( typeof areas[name] !== 'undefined'){
+		$.each(areas, function(index,value) {
+			value.attrs['selected']=false;
+			value.fill('white');
+		});
+		areas[name].attrs['selected']=true;
+		areas[name].fill('#fc0');
+		layer.draw();
+	}
+}
+
+function moveArea(name){
+	console.log(name);
+	$(".sky").attr("src","./img/"+name+".jpg");
+	switch (name){
+	    case "entrance":
+    	    $('#camera').attr("rotation","0 10 0");
+			$('a-image.arrow1').attr("visible",true).attr("position","4 -1 0").attr("rotation","-90 -90 10");
+			icon_links[0]="corridor_1f1";
+			$('a-image.arrow2').attr("visible",true).attr("position","1.5 -1 7").attr("rotation","-90 180 10");
+			icon_links[1]="garden";
+			$('a-image.arrow3').attr("visible",false);
+			$('a-image.circle1').attr("visible",false);
+			$('a-image.circle2').attr("visible",false);
+	    break;
+	    case "corridor_1f1":
+	    	switch (move_from){
+	  		    case "entrance":
+		  		    $('#camera').attr("rotation","0 10 0");
+	    	    break;
+	    	    case "corridor_1f3":
+		    	    $('#camera').attr("rotation","0 100 0");
+	    	    break;
+	    	}
+	    	$('a-image.arrow1').attr("visible",true).attr("position","0 -1 -3").attr("rotation","-90 0 10");
+	    	icon_links[0]="stair_1f";
+			$('a-image.arrow2').attr("visible",true).attr("position","-4 -1 0").attr("rotation","-90 90 10");
+	    	icon_links[1]="entrance";
+			$('a-image.arrow3').attr("visible",true).attr("position","0 -1 5").attr("rotation","-90 180 5");
+	    	icon_links[2]="corridor_1f3";
+			$('a-image.circle1').attr("visible",false);
+			$('a-image.circle2').attr("visible",false);
+	    break;
+	    case "corridor_1f3":
+	    	switch (move_from){
+    		    case "corridor_1f1":
+   					$('#camera').attr("rotation","0 15 0");
+	    	    break;
+    		    case "garden":
+   					$('#camera').attr("rotation","0 165 0");
+	    	    break;
+	    	}
+			$('a-image.arrow1').attr("visible",true).attr("position","-4 -1 0").attr("rotation","-90 85 10");
+	    	icon_links[0]="corridor_1f1";
+			$('a-image.arrow2').attr("visible",true).attr("position","4 -1 0").attr("rotation","-90 -90 10");
+	    	icon_links[1]="garden";
+			$('a-image.arrow3').attr("visible",false);
+			$('a-image.circle1').attr("visible",false);
+			$('a-image.circle2').attr("visible",false);
+	    break;
+	    case "stair_1f":
+	    	switch (move_from){
+    		    case "corridor_1f1":
+   					$('#camera').attr("rotation","0 -75 0");
+	    	    break;
+    		    case "corridor_1f2":
+    		    case "bathroom_1f1":
+   					$('#camera').attr("rotation","0 105 0");
+	    	    break;
+    		    case "stair_2f1":
+					$('#camera').attr("rotation","0 205 0");
+	    	    break;
+	    	}
+			$('a-image.arrow1').attr("visible",true).attr("position","4 -1 -1").attr("rotation","-90 -85 10");
+	    	icon_links[0]="stair_2f1";
+			$('a-image.arrow2').attr("visible",true).attr("position","1 -1 5").attr("rotation","-90 190 10");
+	    	icon_links[1]="corridor_1f2";
+			$('a-image.arrow3').attr("visible",true).attr("position","-1 -1 -4").attr("rotation","-90 0 10");
+	    	icon_links[2]="corridor_1f1";
+			$('a-image.circle1').attr("visible",true).attr("position","2.2 1 4").attr("rotation","0 80 0");
+	    	icon_links[3]="bathroom_1f1";
+			$('a-image.circle2').attr("visible",false);
+	    break;
+	    case "corridor_1f2":
+	    	switch (move_from){
+    		    case "stair_1f":
+    		    case "bathroom_1f1":
+   					$('#camera').attr("rotation","0 25 0");
+	    	    break;
+    		    case "smokeroom":
+    		    case "kitchen2":
+   					$('#camera').attr("rotation","0 -155 0");
+    		    break;
+	    	}
+			$('a-image.arrow1').attr("visible",true).attr("position","5 -1 -0.5").attr("rotation","-90 -85 10");
+	    	icon_links[0]="kitchen2";
+			$('a-image.arrow2').attr("visible",true).attr("position","-4 -1 0.5").attr("rotation","-90 95 10");
+	    	icon_links[1]="stair_1f";
+			$('a-image.arrow3').attr("visible",false);
+			$('a-image.circle1').attr("visible",true).attr("position","3.5 1 -2").attr("rotation","0 0 0");
+	    	icon_links[3]="smokeroom";
+			$('a-image.circle2').attr("visible",true).attr("position","-4 2 -1").attr("rotation","0 20 0");
+	    	icon_links[4]="bathroom_1f1";
+	    break;
+	    case "bathroom_1f1":
+	    	switch (move_from){
+    		    case "stair_1f":
+   					$('#camera').attr("rotation","0 25 0");
+	    	    break;
+	    	}
+			$('a-image.arrow1').attr("visible",true).attr("position","-1 -2 -4").attr("rotation","-90 40 10");
+	    	icon_links[0]="stair_1f";
+			$('a-image.arrow2').attr("visible",false);
+			$('a-image.arrow3').attr("visible",false)
+			$('a-image.circle1').attr("visible",true).attr("position","5 1 -1").attr("rotation","0 90 0");
+	    	icon_links[3]="bathroom_1f2";
+			$('a-image.circle2').attr("visible",false);
+	    break;
+	    case "bathroom_1f2":
+			$('#camera').attr("rotation","-10 120 0");
+			$('a-image.arrow1').attr("visible",false);
+			$('a-image.arrow2').attr("visible",false);
+			$('a-image.arrow3').attr("visible",false);
+			$('a-image.circle1').attr("visible",true).attr("position","-2.5 -2 -4").attr("rotation","0 30 0");
+	    	icon_links[3]="bathroom_1f1";
+			$('a-image.circle2').attr("visible",false);
+	    break;
+	    case "smokeroom":
+			$('#camera').attr("rotation","0 180 0");
+			$('a-image.arrow1').attr("visible",true).attr("position","-3.5 -2 3").attr("rotation","-90 180 0");
+	    	icon_links[0]="corridor_1f2";
+			$('a-image.arrow2').attr("visible",false);
+			$('a-image.arrow3').attr("visible",false);
+			$('a-image.circle1').attr("visible",false);
+			$('a-image.circle2').attr("visible",false);
+	    break;
+	    case "kitchen1":
+			$('#camera').attr("rotation","0 -40 0");
+			$('a-image.arrow1').attr("visible",true).attr("position","2 -2 4").attr("rotation","-90 -120 0");
+	    	icon_links[0]="kitchen2";
+			$('a-image.arrow2').attr("visible",false);
+			$('a-image.arrow3').attr("visible",false);
+			$('a-image.circle1').attr("visible",false);
+			$('a-image.circle2').attr("visible",false);
+	    break;
+	    case "kitchen2":
+	    	switch (move_from){
+    		    case "corridor_1f2":
+   					$('#camera').attr("rotation","0 70 0");
+	    	    break;
+    		    case "kitchen1":
+   					$('#camera').attr("rotation","0 -20 0");
+	    	    break;
+    		    case "washitsu":
+   					$('#camera').attr("rotation","0 160 0");
+	    	    break;
+	    	}
+			$('a-image.arrow1').attr("visible",true).attr("position","-5 -2 0").attr("rotation","-90 70 0");
+	    	icon_links[0]="kitchen1";
+			$('a-image.arrow2').attr("visible",true).attr("position","4 -2 -1").attr("rotation","-90 -110 10");
+	    	icon_links[1]="washitsu";
+			$('a-image.arrow3').attr("visible",true).attr("position","-4 -2 2").attr("rotation","-90 130 10");
+	    	icon_links[2]="corridor_1f2";
+			$('a-image.circle1').attr("visible",false);
+			$('a-image.circle2').attr("visible",false);
+	    break;
+	    case "washitsu":
+			$('#camera').attr("rotation","0 -120 0");
+			$('a-image.arrow1').attr("visible",true).attr("position","-3 -2 3").attr("rotation","-90 170 0");
+	    	icon_links[0]="kitchen2";
+			$('a-image.arrow2').attr("visible",false);
+			$('a-image.arrow3').attr("visible",false);
+			$('a-image.circle1').attr("visible",false);
+			$('a-image.circle2').attr("visible",false);
+	    break;
+	    case "garden":
+	    	switch (move_from){
+    		    case "entrance":
+   					$('#camera').attr("rotation","0 -90 0");
+	    	    break;
+	    	    case "out":
+	    	    case "corridor_1f2":
+   					$('#camera').attr("rotation","0 90 0");
+	    	    break;
+	    	}
+			$('a-image.arrow1').attr("visible",true).attr("position","-2 -2 4").attr("rotation","-90 -120 0");
+	    	icon_links[0]="corridor_1f3";
+			$('a-image.arrow2').attr("visible",true).attr("position","-0.5 -2 -5").attr("rotation","-90 -10 0");
+	    	icon_links[1]="entrance";
+			$('a-image.arrow3').attr("visible",true).attr("position","-2 2 4").attr("rotation","-80 -120 10");
+	    	icon_links[2]="out";
+			$('a-image.circle1').attr("visible",false);
+			$('a-image.circle2').attr("visible",false);
+	    break;
+	    case "stair_2f1":
+			$('#camera').attr("rotation","-40 180 0");
+			$('a-image.arrow1').attr("visible",true).attr("position","-6 -5 2").attr("rotation","-60 90 0");
+	    	icon_links[0]="stair_2f2";
+			$('a-image.arrow2').attr("visible",true).attr("position","-6 -5 -3").attr("rotation","100 -90 0");
+	    	icon_links[1]="stair_1f";
+			$('a-image.arrow3').attr("visible",false);
+			$('a-image.circle1').attr("visible",false);
+			$('a-image.circle2').attr("visible",false);
+	    break;
+	    case "stair_2f2":
+	    	switch (move_from){
+    		    case "stair_2f1":
+   					$('#camera').attr("rotation","-0 180 0");
+	    	    break;
+	    	    case "corridor_2f1":
+   					$('#camera').attr("rotation","-10 -110 0");
+	    	    break;
+	    	}
+			$('a-image.arrow1').attr("visible",true).attr("position","-3 -3 4").attr("rotation","90 0 0");
+	    	icon_links[0]="corridor_2f3";
+			$('a-image.arrow2').attr("visible",true).attr("position","-3 -3 -3").attr("rotation","100 180 0");
+	    	icon_links[1]="corridor_2f1";
+			$('a-image.arrow3').attr("visible",false);
+			$('a-image.circle1').attr("visible",false);
+			$('a-image.circle2').attr("visible",false);
+	    break;
+	    case "corridor_2f1":
+	    	switch (move_from){
+    		    case "stair_2f2":
+   					$('#camera').attr("rotation","0 180 0");
+	    	    break;
+	    	    case "room":
+   					$('#camera').attr("rotation","0 0 0");
+	    	    break;
+	    	}
+			$('a-image.arrow1').attr("visible",true).attr("position","5 -2 1").attr("rotation","90 90 0");
+	    	icon_links[0]="stair_2f2";
+			$('a-image.arrow2').attr("visible",true).attr("position","-4 -2 -0.5").attr("rotation","100 -90 0");
+	    	icon_links[1]="corridor_2f2";
+			$('a-image.arrow3').attr("visible",false);
+			$('a-image.circle1').attr("visible",true).attr("position","-5 2 2").attr("rotation","0 -50 0");
+	    	icon_links[3]="room";
+			$('a-image.circle2').attr("visible",false);
+	    break;
+	    case "room":
+			$('#camera').attr("rotation","10 120 0");
+			$('a-image.arrow1').attr("visible",true).attr("position","-2 -1 -3").attr("rotation","90 -160 0");
+	    	icon_links[0]="corridor_2f1";
+			$('a-image.arrow3').attr("visible",false);
+			$('a-image.circle1').attr("visible",false);
+			$('a-image.circle2').attr("visible",false);
+	    break;
+	    case "corridor_2f2":
+	    	switch (move_from){
+    		    case "corridor_2f1":
+   					$('#camera').attr("rotation","0 180 0");
+	    	    break;
+	    	    case "out":
+   					$('#camera').attr("rotation","0 0 0");
+	    	    break;
+	    	}
+			$('a-image.arrow1').attr("visible",true).attr("position","5 -2 1").attr("rotation","90 90 0");
+	    	icon_links[0]="corridor_2f1";
+			$('a-image.arrow2').attr("visible",true).attr("position","-4 -2 -0.5").attr("rotation","100 -90 0");
+	    	icon_links[1]="out";
+			$('a-image.arrow3').attr("visible",false);
+			$('a-image.circle1').attr("visible",false);
+			$('a-image.circle2').attr("visible",false);
+	    break;
+	    case "out":
+	    	switch (move_from){
+    		    case "garden":
+   					$('#camera').attr("rotation","0 180 0");
+	    	    break;
+	    	    case "corridor_2f2":
+   					$('#camera').attr("rotation","0 0 0");
+	    	    break;
+	    	}
+			$('a-image.arrow1').attr("visible",true).attr("position","-2 -3 3").attr("rotation","120 0 0");
+	    	icon_links[0]="garden";
+			$('a-image.arrow2').attr("visible",true).attr("position","-4 -2 -0.5").attr("rotation","100 -90 0");
+	    	icon_links[1]="corridor_2f2";
+			$('a-image.arrow3').attr("visible",false);
+			$('a-image.circle1').attr("visible",false);
+			$('a-image.circle2').attr("visible",false);
+	    break;
+	    case "corridor_2f3":
+	    	switch (move_from){
+    		    case "stair_2f2":
+   					$('#camera').attr("rotation","0 0 0");
+	    	    break;
+	    	    case "verandah":
+   					$('#camera').attr("rotation","0 180 0");
+	    	    break;
+	    	}
+			$('a-image.arrow1').attr("visible",true).attr("position","5 -2 1").attr("rotation","90 90 0");
+	    	icon_links[0]="verandah";
+			$('a-image.arrow2').attr("visible",true).attr("position","-4 -2 -0.5").attr("rotation","100 -95 0");
+	    	icon_links[1]="stair_2f2";
+			$('a-image.arrow3').attr("visible",false);
+			$('a-image.circle1').attr("visible",true).attr("position","-5 2 -2").attr("rotation","-10 -50 0");
+	    	icon_links[3]="laundry_2f1";
+			$('a-image.circle2').attr("visible",false);
+	    break;
+	    case "corridor_2f3":
+	    	switch (move_from){
+    		    case "stair_2f2":
+   					$('#camera').attr("rotation","0 0 0");
+	    	    break;
+	    	    case "verandah":
+   					$('#camera').attr("rotation","0 180 0");
+	    	    break;
+	    	}
+			$('a-image.arrow1').attr("visible",true).attr("position","5 -2 1").attr("rotation","90 90 0");
+	    	icon_links[0]="verandah";
+			$('a-image.arrow2').attr("visible",true).attr("position","-4 -2 -0.5").attr("rotation","100 -90 0");
+	    	icon_links[1]="stair_2f2";
+			$('a-image.arrow3').attr("visible",false);
+			$('a-image.circle1').attr("visible",true).attr("position","-5 2 -2").attr("rotation","-10 -60 0");
+	    	icon_links[3]="laundry_2f1";
+			$('a-image.circle2').attr("visible",false);
+	    break;
+	    case "verandah":
+			$('#camera').attr("rotation","0 90 0");
+			$('a-image.arrow1').attr("visible",true).attr("position","-0.5 -2 -4").attr("rotation","90 -170 0");
+	    	icon_links[0]="corridor_2f3";
+			$('a-image.arrow2').attr("visible",false);
+			$('a-image.arrow3').attr("visible",false);
+			$('a-image.circle1').attr("visible",false);
+			$('a-image.circle2').attr("visible",false);
+	    break;
+	    case "laundry_2f1":
+			$('#camera').attr("rotation","0 -140 0");
+			$('a-image.arrow1').attr("visible",true).attr("position","-3.5 -2 2").attr("rotation","90 -90 0");
+	    	icon_links[0]="laundry_2f2";
+			$('a-image.arrow2').attr("visible",true).attr("position","-2 -2 3").attr("rotation","90 0 0");
+	    	icon_links[1]="corridor_2f3";
+			$('a-image.arrow3').attr("visible",false);
+			$('a-image.circle1').attr("visible",false);
+			$('a-image.circle2').attr("visible",false);
+	    break;
+	    case "laundry_2f2":
+			$('#camera').attr("rotation","20 -180 0");
+			$('a-image.arrow1').attr("visible",true).attr("position","3 -2 -1").attr("rotation","90 180 0");
+	    	icon_links[0]="laundry_2f1";
+			$('a-image.arrow2').attr("visible",false);
+			$('a-image.arrow3').attr("visible",false);
+			$('a-image.circle1').attr("visible",false);
+			$('a-image.circle2').attr("visible",false);
+	    break;
+	}
+	move_from=name;
+	resetUI(name);
+}
+function makeArea(name, pos_x, pos_y){
+	areas[name] = new Konva.Rect({
+		x: pos_x,
+		y: pos_y,
+		width: 30,
+		height: 30,
+		fill: 'white',
+		stroke: 'black',
+		strokeWidth: 2
+	});
+	areas[name].attrs['name']=name;
+	areas[name].attrs['selected']=false;
+	areas[name].on('click', function(e) {
+		moveArea(e.target.attrs['name']);
+	});
+	areas[name].on('mouseover', function(e) {
+		$("#tooltip").text(area_name[e.target.attrs['name']]);
+		$("#tooltip").css("display","inline-block");
+		e.target.fill('#fc0');
+		layer.draw();
+	});
+	areas[name].on('mouseout', function(e) {
+		$("#tooltip").css("display","none");
+		if(!e.target.attrs['selected']){
+			e.target.fill('white');
+			layer.draw();
+		}
+	});
+	layer.add(areas[name]);
+}
+function makeMiniArea(name, pos_x, pos_y){
+	areas[name] = new Konva.Rect({
+		x: pos_x,
+		y: pos_y,
+		width: 30,
+		height: 15,
+		fill: 'white',
+		stroke: 'black',
+		strokeWidth: 2
+	});
+	areas[name].attrs['name']=name;
+	areas[name].attrs['selected']=false;
+	areas[name].on('click', function(e) {
+		moveArea(e.target.attrs['name']);
+	});
+	areas[name].on('mouseover', function(e) {
+		$("#tooltip").text(area_name[e.target.attrs['name']]);
+		$("#tooltip").css("display","inline-block");
+		e.target.fill('#fc0');
+		layer.draw();
+	});
+	areas[name].on('mouseout', function(e) {
+		$("#tooltip").css("display","none");
+		if(!e.target.attrs['selected']){
+			e.target.fill('white');
+			layer.draw();
+		}
+	});
+	layer.add(areas[name]);
+}
+function makeAreaFree(name, pos_x, pos_y, width, height){
+	areas[name] = new Konva.Rect({
+		x: pos_x,
+		y: pos_y,
+		width: width,
+		height: height,
+		fill: 'white',
+		stroke: 'black',
+		strokeWidth: 2
+	});
+	areas[name].attrs['name']=name;
+	areas[name].attrs['selected']=false;
+	areas[name].on('click', function(e) {
+		moveArea(e.target.attrs['name']);
+	});
+	areas[name].on('mouseover', function(e) {
+		$("#tooltip").text(area_name[e.target.attrs['name']]);
+		$("#tooltip").css("display","inline-block");
+		e.target.fill('#fc0');
+		layer.draw();
+	});
+	areas[name].on('mouseout', function(e) {
+		$("#tooltip").css("display","none");
+		if(!e.target.attrs['selected']){
+			e.target.fill('white');
+			layer.draw();
+		}
+	});
+	layer.add(areas[name]);
+}
+function makelabel(label_text, x, y){
+	let label = new Konva.Text({
+		x: x,
+		y: y,
+		text: label_text,
+		fontSize: 30,
+		fontFamily: 'Calibri',
+		fill: 'white'
+	});
+	layer.add(label);
+	labels.push(label);
+}
+function putIcon(id, icon_x, icon_y){
+	let img = new Image();
+	img.onload = function() {
+		let icon = new Konva.Image({
+			x: icon_x,
+			y: icon_y,
+			image: img,
+			width: 30,
+			height: 30
+		});
+		layer.add(icon);
+		layer.draw();
+	};
+	img.src = './icon/'+id+'.png';
+}
+
+$.each(area_name, function(index, value){
+  $("ul#jump_map").append("<li sky='"+index+"'>"+value+"</li>");
+});
+$("ul#jump_map li").bind('click',function(e){
+	moveArea($(e.target).attr('sky'));
+});
+
+var stage = new Konva.Stage({
+	container: 'map',
+	width: 250,
+	height: 300
+});
+
+var layer = new Konva.Layer();
+
+makelabel('1F',10, 160);
+makeArea('entrance', 100, 190);
+makeArea('corridor_1f3', 70, 220);
+makeArea('corridor_1f1', 100, 220);
+makeArea('stair_1f', 130, 220);
+makeAreaFree('corridor_1f2', 160, 220, 45, 30);
+makeAreaFree('bathroom_1f1', 160, 205, 30, 15);
+makeAreaFree('bathroom_1f2', 160, 190, 30, 15);
+makeArea('kitchen1', 205, 190);
+makeArea('kitchen2', 205, 220);
+makeArea('washitsu', 205, 250);
+makeAreaFree('smokeroom', 190, 190, 15, 30);
+
+putIcon('path', 130, 100);
+makeArea('stair_2f1', 130, 130);
+putIcon('path', 130, 160);
+putIcon('path', 130, 190);
+
+makeArea('garden', 40, 190);
+putIcon('path2', 70, 190);
+putIcon('path3', 40, 220);
+putIcon('path', 40, 100);
+putIcon('path', 40, 130);
+putIcon('path', 40, 160);
+
+
+makelabel('2F',10, 40);
+makeArea('out', 40, 70);
+makeArea('corridor_2f2', 70, 70);
+makeArea('corridor_2f1', 100, 70);
+makeArea('room', 100, 40);
+makeArea('stair_2f2', 130, 70);
+makeAreaFree('corridor_2f3', 160, 70, 45, 30);
+makeArea('verandah', 205, 70);
+makeAreaFree('laundry_2f1', 160, 55, 30, 15);
+makeAreaFree('laundry_2f2', 160, 40, 30, 15);
+
+stage.add(layer);
+
+$(window).mousemove(function(e){
+	let left_axis= e.clientX+10;
+	if($(window).width()<left_axis+$("#tooltip").width()){
+		left_axis=e.clientX-$("#tooltip").width();
+	}
+	$("#tooltip").css({
+		top:e.clientY+10,
+		left:left_axis
+	});
+});
+
+$('a-image.arrow1').click(function () {
+	moveArea(icon_links[0]);
+});
+$('a-image.arrow2').click(function () {
+	moveArea(icon_links[1]);
+});
+$('a-image.arrow3').click(function () {
+	moveArea(icon_links[2]);
+});
+$('a-image.circle1').click(function () {
+	moveArea(icon_links[3]);
+});
+$('a-image.circle2').click(function () {
+	moveArea(icon_links[4]);
+});
+
+//init
+moveArea("entrance");
+
+</script>
+</body>
+</html>

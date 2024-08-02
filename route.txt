@@ -1,0 +1,16 @@
+　　　　　　　　entrance
+　　　　　　　　　　|
+corridor_1f3 - corridor_1f1 - (stair_1f) - corridor_1f2 - (kitchen)
+　　　　　　　　　　　　　　　　　|　　　　　　|
+														(bathroom_1f1) (bathroom_1f1)
+
+(bathroom_1f1) - bathroom_1f2
+
+(stair_1f) - (stair_2f1)
+
+(garden) - out - corridor_2f2 - corridor_2f1 - (stair_2f2) - corridor_2f3 - verandah
+　　　　　　　　　　　　　　　　　　|　　　　　　　　　　　　　　 |
+　　　　　　　　　　　　　　　　　room　　　　　　　　　　　 (bathroom_2f1)
+
+(bathroom_2f1)
+
